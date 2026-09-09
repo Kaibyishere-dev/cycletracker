@@ -16,7 +16,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Kredensial tidak valid' }, { status: 401 });
     }
 
-    return NextResponse.json({ user });
+    const response = NextResponse.json({ user });
+    response.cookies.set('ct_session', JSON.stringify(user), {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 60 * 60 * 24, // 24 hours
+    });
+    return response;
   } catch (err: any) {
     console.error('Login exception:', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

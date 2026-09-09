@@ -1,14 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { getSessionFromCookie } from '@/lib/auth-server';
 
 export async function GET() {
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
+    const session = await getSessionFromCookie();
+    if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const supabase = await createClient();
     const { data, error } = await supabase
       .from('tracker_approval')
       .select('*')
@@ -40,12 +41,12 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
+    const session = await getSessionFromCookie();
+    if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const supabase = await createClient();
     const body = await request.json();
     const { tanggal, weekApproval, remarkSudahDiScan, photoUrl, photoName, catatan, editedBy } = body;
 
