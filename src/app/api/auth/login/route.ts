@@ -17,13 +17,23 @@ export async function POST(request: NextRequest) {
     }
 
     const response = NextResponse.json({ user });
+
+    // Use sameSite:'none' + secure:true so the cookie works in cross-origin
+    // iframe environments (Rocket preview, Vercel production).
+    // On plain localhost (http) sameSite:'none' requires secure:true which
+    // won't work, so we fall back to 'lax' only when explicitly on localhost.
+    const isLocalhost =
+      request.headers.get('host')?.startsWith('localhost') ||
+      request.headers.get('host')?.startsWith('127.0.0.1');
+
     response.cookies.set('ct_session', JSON.stringify(user), {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      secure: !isLocalhost,
+      sameSite: isLocalhost ? 'lax' : 'none',
       path: '/',
       maxAge: 60 * 60 * 24, // 24 hours
     });
+
     return response;
   } catch (err: any) {
     console.error('Login exception:', err);

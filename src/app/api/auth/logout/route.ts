@@ -1,12 +1,16 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 
-export async function POST() {
+export async function POST(request: NextRequest) {
   try {
+    const isLocalhost =
+      request.headers.get('host')?.startsWith('localhost') ||
+      request.headers.get('host')?.startsWith('127.0.0.1');
+
     const response = NextResponse.json({ success: true });
     response.cookies.set('ct_session', '', {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      secure: !isLocalhost,
+      sameSite: isLocalhost ? 'lax' : 'none',
       path: '/',
       maxAge: 0,
     });

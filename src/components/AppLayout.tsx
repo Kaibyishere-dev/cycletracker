@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useEffect } from 'react';
 import Sidebar from './Sidebar';
-import { getSession, clearSession, AdminUser } from '@/lib/auth';
+import { getSession, saveSession, clearSession, AdminUser } from '@/lib/auth';
 import { useRouter } from 'next/navigation';
 
 interface AppLayoutProps {
@@ -16,16 +16,35 @@ export default function AppLayout({ children, activeRoute }: AppLayoutProps) {
   const [user, setUser] = useState<AdminUser | null>(null);
 
   useEffect(() => {
-    const session = getSession();
-    if (!session) {
-      router.replace('/login-screen');
-    } else {
-      setUser(session);
+    async function initSession() {
+      // First try localStorage (fast path — already logged in this tab)
+      const localSession = getSession();
+      if (localSession) {
+        setUser(localSession);
+        return;
+      }
+
+      // Fallback: re-hydrate from HTTP cookie (handles page refresh / new tab)
+      try {
+        const res = await fetch('/api/auth/me');
+        if (res.ok) {
+          const { user: cookieUser } = await res.json();
+          // Persist back to localStorage so subsequent checks are instant
+          saveSession(cookieUser);
+          setUser(cookieUser);
+        } else {
+          // No valid cookie — redirect to login
+          router.replace('/login-screen');
+        }
+      } catch {
+        router.replace('/login-screen');
+      }
     }
+
+    initSession();
   }, [router]);
 
   function handleLogout() {
-    // Also sign out from Supabase session
     fetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
     clearSession();
     router.replace('/login-screen');
