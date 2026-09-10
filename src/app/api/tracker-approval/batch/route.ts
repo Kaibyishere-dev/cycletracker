@@ -11,14 +11,21 @@ export async function POST(request: NextRequest) {
 
     const supabase = createAdminClient();
     const body = await request.json();
-    const { tanggal, weekApproval, tasks, editedBy } = body;
+    const { weekApproval, tasks, editedBy } = body;
 
-    if (!tanggal || !weekApproval || !Array.isArray(tasks) || tasks.length === 0) {
-      return NextResponse.json({ error: 'Tanggal, week approval, dan minimal 1 task wajib diisi' }, { status: 400 });
+    if (!weekApproval || !Array.isArray(tasks) || tasks.length === 0) {
+      return NextResponse.json({ error: 'Week approval dan minimal 1 task wajib diisi' }, { status: 400 });
+    }
+
+    // Validate each task has a tanggal
+    for (const task of tasks) {
+      if (!task.tanggal) {
+        return NextResponse.json({ error: 'Setiap task wajib memiliki tanggal' }, { status: 400 });
+      }
     }
 
     const rows = tasks.map((task: any) => ({
-      tanggal,
+      tanggal: task.tanggal,
       week_approval: weekApproval,
       remark_sudah_di_scan: task.remarkSudahDiScan ?? 'Belum Di Scan',
       cycle_count: task.cycleCount ?? '',
