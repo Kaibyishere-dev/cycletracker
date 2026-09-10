@@ -16,7 +16,10 @@ export interface ApprovalEntry {
   id: string;
   tanggal: string;
   weekApproval: string;
-  remarkSudahDiScan: 'Sudah Di Scan' | 'Belum Di Scan';
+  remarkSudahDiScan: 'Sudah Di Scan' | 'Pending' | 'Belum Di Scan';
+  cycleCount: string;
+  pdfUrl: string | null;
+  pdfName: string | null;
   photoUrl: string | null;
   photoName: string | null;
   catatan: string;
@@ -215,7 +218,7 @@ export const initialApproval: ApprovalEntry[] = [
   tanggal: '2026-09-03',
   weekApproval: 'W36',
   remarkSudahDiScan: 'Sudah Di Scan',
-  photoUrl: 'https://images.unsplash.com/photo-1568667256549-094345857637?w=400',
+  photoUrl: "https://img.rocket.new/generatedImages/rocket_gen_img_13136dede-1766563415425.png",
   photoName: 'apv_w36_04.jpg',
   catatan: '',
   editedBy: 'admin.cyclecount',
