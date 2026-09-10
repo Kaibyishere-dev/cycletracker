@@ -242,8 +242,11 @@ export default function EmailSupplierContent() {
   }
 
   function formatDate(dateStr: string) {
+    const BULAN = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
     const [y, m, d] = dateStr.split('-');
-    return `${d}/${m}/${y}`;
+    if (!y || !m || !d) return dateStr;
+    const bulan = BULAN[parseInt(m, 10) - 1] ?? m;
+    return `${parseInt(d, 10)} ${bulan} ${y}`;
   }
 
   function getExpiryBadge(entry: EmailSupplierEntry) {

@@ -438,8 +438,10 @@ export default function TrackerApprovalContent() {
 
   function formatDate(dateStr: string) {
     if (!dateStr) return '—';
+    const BULAN = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
     const [y, m, d] = dateStr.split('-');
-    return `${d}/${m}/${y}`;
+    const bulan = BULAN[parseInt(m, 10) - 1] ?? m;
+    return `${parseInt(d, 10)} ${bulan} ${y}`;
   }
 
   function groupDateLabel(tasks: ApprovalEntry[]): string {
