@@ -233,17 +233,21 @@ export default function TrackerHasilSOContent() {
   }
 
   function formatDate(dateStr: string) {
+    const BULAN = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
     const [y, m, d] = dateStr.split('-');
-    return `${d}/${m}/${y}`;
+    if (!y || !m || !d) return dateStr;
+    const bulan = BULAN[parseInt(m, 10) - 1] ?? m;
+    return `${parseInt(d, 10)} ${bulan} ${y}`;
   }
 
   function formatDateTime(dtStr: string) {
+    const BULAN = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Ags','Sep','Okt','Nov','Des'];
     const dt = new Date(dtStr);
-    const d = String(dt.getDate()).padStart(2, '0');
-    const mo = String(dt.getMonth() + 1).padStart(2, '0');
+    const d = dt.getDate();
+    const mo = BULAN[dt.getMonth()] ?? String(dt.getMonth() + 1);
     const h = String(dt.getHours()).padStart(2, '0');
     const mi = String(dt.getMinutes()).padStart(2, '0');
-    return `${d}/${mo} ${h}:${mi}`;
+    return `${d} ${mo} ${h}:${mi}`;
   }
 
   return (
