@@ -1,6 +1,6 @@
 'use client';
 import React, { useState, useEffect, useCallback } from 'react';
-import { Search, Plus, Edit2, Trash2, Mail, AlertTriangle, Clock, CheckCircle, Filter, X, Bell, ChevronRight, Calendar, MessageSquareOff, RefreshCw } from 'lucide-react';
+import { Search, Plus, Edit2, Trash2, Mail, AlertTriangle, Clock, CheckCircle, Filter, X, Bell, ChevronRight, Calendar, MessageSquareOff, RefreshCw, Recycle } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import SummaryCard from '@/components/ui/SummaryCard';
 import ConfirmModal from '@/components/ui/ConfirmModal';
@@ -9,6 +9,7 @@ import { getSession } from '@/lib/auth';
 
 export type LetterStatus = 'LETTER 1' | 'LETTER 2' | 'LETTER 3' | 'FINAL LETTER';
 export type ReplyStatus = 'Belum Ada Balasan' | 'Sudah Ada Balasan';
+export type DisplayStatus = LetterStatus | 'PROPOS DISPOS';
 
 export interface EmailSupplierEntry {
   id: string;
@@ -35,7 +36,7 @@ type FormValues = {
   catatan: string;
 };
 
-type FilterLetter = 'Semua' | LetterStatus;
+type FilterLetter = 'Semua' | LetterStatus | 'PROPOS DISPOS';
 type FilterReply = 'Semua' | ReplyStatus;
 
 const LETTER_OPTIONS: LetterStatus[] = ['LETTER 1', 'LETTER 2', 'LETTER 3', 'FINAL LETTER'];
@@ -57,6 +58,28 @@ function daysUntilExpiry(entry: EmailSupplierEntry): number {
   return 7 - daysSince(entry.tanggalLetterTerakhir);
 }
 
+/**
+ * Determines if a FINAL LETTER entry has passed its validity period.
+ * FINAL LETTER is considered expired when tanggalLetterTerakhir is in the past (today or earlier counts as expired).
+ * We use daysSince > 0 meaning the date has passed (strictly past).
+ */
+function isFinalLetterExpired(entry: EmailSupplierEntry): boolean {
+  if (entry.replyStatus === 'Sudah Ada Balasan') return false;
+  if (entry.letterStatus !== 'FINAL LETTER') return false;
+  // FINAL LETTER expires when the tanggalLetterTerakhir date has passed (day after)
+  return daysSince(entry.tanggalLetterTerakhir) > 0;
+}
+
+/**
+ * Returns the computed display status for an entry.
+ * If FINAL LETTER has expired → PROPOS DISPOS
+ * Otherwise → the stored letterStatus
+ */
+function getDisplayStatus(entry: EmailSupplierEntry): DisplayStatus {
+  if (isFinalLetterExpired(entry)) return 'PROPOS DISPOS';
+  return entry.letterStatus;
+}
+
 const LETTER_COLORS: Record<LetterStatus, string> = {
   'LETTER 1': 'bg-blue-50 text-blue-700 border border-blue-200',
   'LETTER 2': 'bg-amber-50 text-amber-700 border border-amber-200',
@@ -64,12 +87,25 @@ const LETTER_COLORS: Record<LetterStatus, string> = {
   'FINAL LETTER': 'bg-red-50 text-red-700 border border-red-200',
 };
 
+const DISPOSAL_COLOR = 'bg-purple-50 text-purple-700 border border-purple-200';
+const DISPOSAL_DOT = 'bg-purple-500';
+
 const LETTER_DOT: Record<LetterStatus, string> = {
   'LETTER 1': 'bg-blue-500',
   'LETTER 2': 'bg-amber-500',
   'LETTER 3': 'bg-orange-500',
   'FINAL LETTER': 'bg-red-500',
 };
+
+function getStatusColor(status: DisplayStatus): string {
+  if (status === 'PROPOS DISPOS') return DISPOSAL_COLOR;
+  return LETTER_COLORS[status as LetterStatus];
+}
+
+function getStatusDot(status: DisplayStatus): string {
+  if (status === 'PROPOS DISPOS') return DISPOSAL_DOT;
+  return LETTER_DOT[status as LetterStatus];
+}
 
 export default function EmailSupplierContent() {
   const [entries, setEntries] = useState<EmailSupplierEntry[]>([]);
@@ -106,11 +142,13 @@ export default function EmailSupplierContent() {
   useEffect(() => { fetchEntries(); }, [fetchEntries]);
 
   const filtered = entries.filter((e) => {
+    const displayStatus = getDisplayStatus(e);
     const matchSearch = e.namaPT.toLowerCase().includes(search.toLowerCase()) ||
       e.namaBarang.toLowerCase().includes(search.toLowerCase()) ||
       e.kodeBarang.toLowerCase().includes(search.toLowerCase()) ||
       e.catatan.toLowerCase().includes(search.toLowerCase());
-    const matchLetter = filterLetter === 'Semua' || e.letterStatus === filterLetter;
+    const matchLetter = filterLetter === 'Semua' ||
+      (filterLetter === 'PROPOS DISPOS' ? displayStatus === 'PROPOS DISPOS' : e.letterStatus === filterLetter && displayStatus !== 'PROPOS DISPOS');
     const matchReply = filterReply === 'Semua' || e.replyStatus === filterReply;
     const matchExpired = !filterExpired || isExpired(e);
     return matchSearch && matchLetter && matchReply && matchExpired;
@@ -119,12 +157,22 @@ export default function EmailSupplierContent() {
   const totalEntries = entries.length;
   const totalExpired = entries.filter((e) => isExpired(e)).length;
   const totalReplied = entries.filter((e) => e.replyStatus === 'Sudah Ada Balasan').length;
-  const totalFinalLetter = entries.filter((e) => e.letterStatus === 'FINAL LETTER' && e.replyStatus === 'Belum Ada Balasan').length;
+  // FINAL LETTER aktif = FINAL LETTER yang belum expired (belum jadi PROPOS DISPOS)
+  const totalFinalLetter = entries.filter((e) => e.letterStatus === 'FINAL LETTER' && e.replyStatus === 'Belum Ada Balasan' && !isFinalLetterExpired(e)).length;
+  const totalDisposal = entries.filter((e) => isFinalLetterExpired(e)).length;
 
+  // Distribution: LETTER 1/2/3 = stored status (excluding PROPOS DISPOS entries)
+  // FINAL LETTER = only those not yet expired
+  // DISPOSAL = those with PROPOS DISPOS computed status
   const letterDist = LETTER_OPTIONS.reduce<Record<string, number>>((acc, l) => {
-    acc[l] = entries.filter((e) => e.letterStatus === l).length;
+    if (l === 'FINAL LETTER') {
+      acc[l] = entries.filter((e) => e.letterStatus === l && !isFinalLetterExpired(e)).length;
+    } else {
+      acc[l] = entries.filter((e) => e.letterStatus === l).length;
+    }
     return acc;
   }, {});
+  const disposalDist = totalDisposal;
 
   function openAddModal() {
     setEditingEntry(null);
@@ -198,18 +246,14 @@ export default function EmailSupplierContent() {
     return `${d}/${m}/${y}`;
   }
 
-  function formatDateTime(dtStr: string) {
-    const dt = new Date(dtStr);
-    const d = String(dt.getDate()).padStart(2, '0');
-    const mo = String(dt.getMonth() + 1).padStart(2, '0');
-    const h = String(dt.getHours()).padStart(2, '0');
-    const mi = String(dt.getMinutes()).padStart(2, '0');
-    return `${d}/${mo} ${h}:${mi}`;
-  }
-
   function getExpiryBadge(entry: EmailSupplierEntry) {
     if (entry.replyStatus === 'Sudah Ada Balasan') {
       return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-green-50 text-green-700 border border-green-200"><CheckCircle size={10} />Sudah Dibalas</span>;
+    }
+    // If PROPOS DISPOS, show special badge
+    if (isFinalLetterExpired(entry)) {
+      const daysPast = daysSince(entry.tanggalLetterTerakhir);
+      return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-200"><Recycle size={10} />Final Letter berakhir {daysPast}h lalu</span>;
     }
     const days = daysUntilExpiry(entry);
     if (days < 0) return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-red-50 text-red-700 border border-red-200 animate-pulse"><AlertTriangle size={10} />Kadaluarsa {Math.abs(days)}h lalu</span>;
@@ -218,7 +262,9 @@ export default function EmailSupplierContent() {
     return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-muted text-muted-foreground"><Clock size={10} />{days}h lagi</span>;
   }
 
-  const expiredEntries = entries.filter((e) => isExpired(e));
+  // Alert: expired entries (letter 1/2/3 expired) + PROPOS DISPOS entries
+  const expiredEntries = entries.filter((e) => isExpired(e) && !isFinalLetterExpired(e));
+  const proposDisposEntries = entries.filter((e) => isFinalLetterExpired(e));
 
   return (
     <div className="p-6 xl:p-8 max-w-screen-2xl mx-auto">
@@ -234,7 +280,7 @@ export default function EmailSupplierContent() {
       </div>
 
       {expiredEntries.length > 0 && (
-        <div className="mb-5 rounded-xl border border-red-200 bg-red-50 p-4 flex items-start gap-3">
+        <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-4 flex items-start gap-3">
           <div className="flex-shrink-0 w-8 h-8 rounded-full bg-red-100 flex items-center justify-center mt-0.5">
             <Bell size={15} className="text-red-600" />
           </div>
@@ -251,6 +297,29 @@ export default function EmailSupplierContent() {
             </div>
           </div>
           <button onClick={() => setFilterExpired(true)} className="flex-shrink-0 flex items-center gap-1 text-xs font-semibold text-red-600 hover:text-red-800 transition-colors whitespace-nowrap">
+            Lihat Semua <ChevronRight size={12} />
+          </button>
+        </div>
+      )}
+
+      {proposDisposEntries.length > 0 && (
+        <div className="mb-5 rounded-xl border border-purple-200 bg-purple-50 p-4 flex items-start gap-3">
+          <div className="flex-shrink-0 w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center mt-0.5">
+            <Recycle size={15} className="text-purple-600" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-bold text-purple-700 mb-1">{proposDisposEntries.length} Supplier Perlu Proses Disposal — FINAL LETTER Telah Berakhir</p>
+            <div className="flex flex-wrap gap-2">
+              {proposDisposEntries.map((e) => (
+                <span key={`dispos-pill-${e.id}`} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white border border-purple-200 text-xs font-medium text-purple-700">
+                  <span className="w-1.5 h-1.5 rounded-full flex-shrink-0 bg-purple-500" />
+                  {e.namaPT} — PROPOS DISPOS
+                  <span className="text-purple-400 font-normal">(Final Letter: {formatDate(e.tanggalLetterTerakhir)})</span>
+                </span>
+              ))}
+            </div>
+          </div>
+          <button onClick={() => setFilterLetter('PROPOS DISPOS')} className="flex-shrink-0 flex items-center gap-1 text-xs font-semibold text-purple-600 hover:text-purple-800 transition-colors whitespace-nowrap">
             Lihat Semua <ChevronRight size={12} />
           </button>
         </div>
@@ -274,6 +343,13 @@ export default function EmailSupplierContent() {
               {letter} — {letterDist[letter] ?? 0} item
             </button>
           ))}
+          <button
+            onClick={() => setFilterLetter(filterLetter === 'PROPOS DISPOS' ? 'Semua' : 'PROPOS DISPOS')}
+            className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold transition-all duration-150
+              ${filterLetter === 'PROPOS DISPOS' ? 'ring-2 ring-purple-500 ring-offset-1' : ''} ${DISPOSAL_COLOR}`}>
+            <span className={`w-1.5 h-1.5 rounded-full ${DISPOSAL_DOT}`} />
+            DISPOSAL — {disposalDist} item
+          </button>
         </div>
       </div>
 
@@ -299,7 +375,7 @@ export default function EmailSupplierContent() {
           </button>
         )}
         {filterLetter !== 'Semua' && (
-          <button onClick={() => setFilterLetter('Semua')} className="flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-semibold bg-primary/10 text-primary border border-primary/20">
+          <button onClick={() => setFilterLetter('Semua')} className={`flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-semibold border ${filterLetter === 'PROPOS DISPOS' ? 'bg-purple-50 text-purple-700 border-purple-200' : 'bg-primary/10 text-primary border-primary/20'}`}>
             {filterLetter}<X size={12} />
           </button>
         )}
@@ -345,13 +421,16 @@ export default function EmailSupplierContent() {
                 ) : (
                   filtered.map((entry, idx) => {
                     const expired = isExpired(entry);
+                    const displayStatus = getDisplayStatus(entry);
+                    const isDisposal = displayStatus === 'PROPOS DISPOS';
                     return (
                       <tr key={entry.id} className={`border-b border-border last:border-0 hover:bg-muted/40 transition-colors duration-150
-                        ${removingId === entry.id ? 'row-exit' : ''} ${expired ? 'bg-red-50/40' : idx % 2 === 0 ? '' : 'bg-muted/20'}`}>
+                        ${removingId === entry.id ? 'row-exit' : ''} ${isDisposal ? 'bg-purple-50/30' : expired ? 'bg-red-50/40' : idx % 2 === 0 ? '' : 'bg-muted/20'}`}>
                         <td className="px-4 py-3 text-muted-foreground font-tabular text-xs">{idx + 1}</td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2">
-                            {expired && <AlertTriangle size={13} className="text-red-500 flex-shrink-0" />}
+                            {isDisposal && <Recycle size={13} className="text-purple-500 flex-shrink-0" />}
+                            {!isDisposal && expired && <AlertTriangle size={13} className="text-red-500 flex-shrink-0" />}
                             <span className="font-medium text-foreground text-sm">{entry.namaPT}</span>
                           </div>
                         </td>
@@ -362,9 +441,9 @@ export default function EmailSupplierContent() {
                           </div>
                         </td>
                         <td className="px-4 py-3">
-                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${LETTER_COLORS[entry.letterStatus]}`}>
-                            <span className={`w-1.5 h-1.5 rounded-full ${LETTER_DOT[entry.letterStatus]}`} />
-                            {entry.letterStatus}
+                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${getStatusColor(displayStatus)}`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${getStatusDot(displayStatus)}`} />
+                            {displayStatus}
                           </span>
                         </td>
                         <td className="px-4 py-3 font-tabular text-sm text-foreground">{formatDate(entry.tanggalLetter1)}</td>
@@ -442,6 +521,10 @@ export default function EmailSupplierContent() {
                     </label>
                   ))}
                 </div>
+                <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
+                  <Recycle size={11} className="text-purple-500" />
+                  Status <strong>PROPOS DISPOS</strong> dihitung otomatis saat masa FINAL LETTER berakhir.
+                </p>
               </div>
               <div>
                 <label className="block text-sm font-semibold text-foreground mb-1.5">Tanggal LETTER 1 Dikirim <span className="text-danger">*</span></label>
@@ -454,7 +537,7 @@ export default function EmailSupplierContent() {
               </div>
               <div>
                 <label className="block text-sm font-semibold text-foreground mb-1.5">Tanggal LETTER Terakhir Dikirim <span className="text-danger">*</span></label>
-                <p className="text-xs text-muted-foreground mb-1.5">Notifikasi kadaluarsa dihitung 7 hari dari tanggal ini.</p>
+                <p className="text-xs text-muted-foreground mb-1.5">Notifikasi kadaluarsa dihitung 7 hari dari tanggal ini. Untuk FINAL LETTER, tanggal ini juga menentukan kapan status berubah ke PROPOS DISPOS.</p>
                 <div className="relative">
                   <Calendar size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                   <input {...register('tanggalLetterTerakhir', { required: 'Tanggal LETTER terakhir wajib diisi', validate: (val) => !watchedLetter1 || val >= watchedLetter1 || 'Tanggal LETTER terakhir tidak boleh sebelum LETTER 1' })} type="date" className="input-field pl-9" />
