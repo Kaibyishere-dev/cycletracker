@@ -75,7 +75,7 @@ export default function Sidebar({
           <AppLogo size={32} />
           {!collapsed && (
             <span className="font-bold text-base tracking-tight text-primary-foreground truncate">
-              CycleTracker
+              Cycle Count
             </span>
           )}
         </div>
