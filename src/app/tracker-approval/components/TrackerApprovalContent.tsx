@@ -675,7 +675,7 @@ export default function TrackerApprovalContent() {
                             {formatDate(task.tanggal)}
                           </td>
                           {isFirst && (
-                            <td rowSpan={taskCount} className="px-4 py-3 align-top border-r border-border/40">
+                            <td rowSpan={taskCount} className="px-4 py-3 align-middle border-r border-border/40 text-center">
                               <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-primary/10 text-primary">
                                 {group.week}
                               </span>
