@@ -15,7 +15,7 @@ export async function PUT(
     const supabase = createAdminClient();
     const { id } = await params;
     const body = await request.json();
-    const { tanggal, weekApproval, remarkSudahDiScan, photoUrl, photoName, catatan, editedBy } = body;
+    const { tanggal, weekApproval, remarkSudahDiScan, cycleCount, pdfUrl, pdfName, catatan, editedBy } = body;
 
     if (!tanggal || !weekApproval || !remarkSudahDiScan) {
       return NextResponse.json({ error: 'Tanggal, week approval, dan remark scan wajib diisi' }, { status: 400 });
@@ -27,8 +27,9 @@ export async function PUT(
         tanggal,
         week_approval: weekApproval,
         remark_sudah_di_scan: remarkSudahDiScan,
-        photo_url: photoUrl ?? null,
-        photo_name: photoName ?? null,
+        cycle_count: cycleCount ?? '',
+        pdf_url: pdfUrl ?? null,
+        pdf_name: pdfName ?? null,
         catatan: catatan ?? '',
         edited_by: editedBy ?? '',
         edited_at: new Date().toISOString(),
@@ -51,8 +52,11 @@ export async function PUT(
       tanggal: data.tanggal,
       weekApproval: data.week_approval,
       remarkSudahDiScan: data.remark_sudah_di_scan,
-      photoUrl: data.photo_url,
-      photoName: data.photo_name,
+      cycleCount: data.cycle_count ?? '',
+      pdfUrl: data.pdf_url ?? null,
+      pdfName: data.pdf_name ?? null,
+      photoUrl: data.photo_url ?? null,
+      photoName: data.photo_name ?? null,
       catatan: data.catatan,
       editedBy: data.edited_by,
       editedAt: data.edited_at,
