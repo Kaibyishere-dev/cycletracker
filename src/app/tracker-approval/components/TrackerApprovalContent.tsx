@@ -30,6 +30,7 @@ type SortDir = 'asc' | 'desc';
 // A single task row in the "Add" form
 interface TaskRow {
   id: string; // local only, for React key
+  tanggal: string;
   cycleCount: string;
   remarkSudahDiScan: 'Sudah Di Scan' | 'Pending' | 'Belum Di Scan';
   catatan: string;
@@ -45,6 +46,7 @@ const CYCLE_COUNT_OPTIONS = ['TOP SHRINKAGE', 'TOP OVERAGE', 'REGULAR', 'REGULAR
 function makeTaskRow(): TaskRow {
   return {
     id: Math.random().toString(36).slice(2),
+    tanggal: new Date().toISOString().split('T')[0],
     cycleCount: 'TOP SHRINKAGE',
     remarkSudahDiScan: 'Belum Di Scan',
     catatan: '',
@@ -87,10 +89,8 @@ export default function TrackerApprovalContent() {
   const [editingEntry, setEditingEntry] = useState<ApprovalEntry | null>(null);
 
   // Add-mode multi-task state
-  const [addTanggal, setAddTanggal] = useState('');
   const [addWeek, setAddWeek] = useState('');
   const [addWeekError, setAddWeekError] = useState('');
-  const [addTanggalError, setAddTanggalError] = useState('');
   const [taskRows, setTaskRows] = useState<TaskRow[]>([makeTaskRow()]);
   const [addSubmitting, setAddSubmitting] = useState(false);
 
@@ -236,9 +236,7 @@ export default function TrackerApprovalContent() {
 
   function openAddModal() {
     setEditingEntry(null);
-    setAddTanggal(new Date().toISOString().split('T')[0]);
     setAddWeek('');
-    setAddTanggalError('');
     setAddWeekError('');
     setTaskRows([makeTaskRow()]);
     setModalOpen(true);
@@ -311,8 +309,14 @@ export default function TrackerApprovalContent() {
   async function handleAddSubmit(e: React.FormEvent) {
     e.preventDefault();
     let valid = true;
-    if (!addTanggal) { setAddTanggalError('Tanggal wajib diisi'); valid = false; } else { setAddTanggalError(''); }
     if (!addWeek.trim()) { setAddWeekError('Week wajib diisi'); valid = false; } else { setAddWeekError(''); }
+    // Validate each task has a tanggal
+    const taskRowsWithErrors = taskRows.map((row) => {
+      if (!row.tanggal) return { ...row, pdfError: row.pdfError };
+      return row;
+    });
+    const anyMissingDate = taskRows.some((row) => !row.tanggal);
+    if (anyMissingDate) { valid = false; }
     if (!valid) return;
 
     setAddSubmitting(true);
@@ -332,6 +336,7 @@ export default function TrackerApprovalContent() {
             pdfName = uploaded.name;
           }
           return {
+            tanggal: row.tanggal,
             cycleCount: row.cycleCount,
             remarkSudahDiScan: row.remarkSudahDiScan,
             catatan: row.catatan,
@@ -345,7 +350,6 @@ export default function TrackerApprovalContent() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          tanggal: addTanggal,
           weekApproval: addWeek.trim(),
           tasks: resolvedTasks,
           editedBy,
@@ -781,33 +785,19 @@ export default function TrackerApprovalContent() {
             </div>
 
             <form onSubmit={handleAddSubmit} className="px-6 py-5 space-y-5">
-              {/* Tanggal + Week */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-semibold text-foreground mb-1.5">
-                    Tanggal <span className="text-danger">*</span>
-                  </label>
-                  <input
-                    type="date"
-                    value={addTanggal}
-                    onChange={(e) => setAddTanggal(e.target.value)}
-                    className="input-field"
-                  />
-                  {addTanggalError && <p className="mt-1 text-xs text-danger">{addTanggalError}</p>}
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-foreground mb-1.5">
-                    Week Approval <span className="text-danger">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Contoh: W37"
-                    value={addWeek}
-                    onChange={(e) => setAddWeek(e.target.value)}
-                    className="input-field"
-                  />
-                  {addWeekError && <p className="mt-1 text-xs text-danger">{addWeekError}</p>}
-                </div>
+              {/* Week only */}
+              <div>
+                <label className="block text-sm font-semibold text-foreground mb-1.5">
+                  Week Approval <span className="text-danger">*</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="Contoh: W37"
+                  value={addWeek}
+                  onChange={(e) => setAddWeek(e.target.value)}
+                  className="input-field"
+                />
+                {addWeekError && <p className="mt-1 text-xs text-danger">{addWeekError}</p>}
               </div>
 
               {/* Task rows */}
@@ -828,6 +818,21 @@ export default function TrackerApprovalContent() {
                           <X size={14} />
                         </button>
                       )}
+                    </div>
+
+                    {/* Tanggal per task */}
+                    <div>
+                      <label className="block text-xs font-semibold text-foreground mb-1">
+                        Tanggal <span className="text-danger">*</span>
+                      </label>
+                      <input
+                        type="date"
+                        value={row.tanggal}
+                        onChange={(e) => updateTaskRow(row.id, { tanggal: e.target.value })}
+                        className={`input-field text-sm ${!row.tanggal ? 'border-danger' : ''}`}
+                        required
+                      />
+                      {!row.tanggal && <p className="mt-1 text-xs text-danger">Tanggal wajib diisi</p>}
                     </div>
 
                     {/* Cycle Count */}
