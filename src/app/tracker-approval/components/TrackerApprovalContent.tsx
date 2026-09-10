@@ -9,7 +9,6 @@ import {
 import { ApprovalEntry } from '@/lib/store';
 import { useForm } from 'react-hook-form';
 import SummaryCard from '@/components/ui/SummaryCard';
-
 import ConfirmModal from '@/components/ui/ConfirmModal';
 import ToastContainer, { useToast } from '@/components/ui/Toast';
 import { getSession } from '@/lib/auth';
@@ -35,6 +34,14 @@ function parseWeekNum(week: string): number {
 
 function parseDateVal(dateStr: string): number {
   return new Date(dateStr).getTime();
+}
+
+// A grouped week row
+interface WeekGroup {
+  week: string;
+  tasks: ApprovalEntry[];
+  // representative date for sorting (earliest or latest depending on sort)
+  dateVal: number;
 }
 
 export default function TrackerApprovalContent() {
@@ -78,43 +85,60 @@ export default function TrackerApprovalContent() {
 
   useEffect(() => { fetchEntries(); }, [fetchEntries]);
 
-  // Derive unique weeks from data
+  // Derive unique weeks from data (sorted numerically)
   const availableWeeks = Array.from(new Set(entries.map((e) => e.weekApproval)))
     .sort((a, b) => parseWeekNum(a) - parseWeekNum(b));
 
-  // Filter + sort
-  const filtered = entries
-    .filter((e) => {
-      const q = search.toLowerCase();
-      const matchSearch = !q ||
-        e.weekApproval.toLowerCase().includes(q) ||
-        e.tanggal.includes(q) ||
-        formatDate(e.tanggal).includes(q) ||
-        e.catatan.toLowerCase().includes(q) ||
-        e.cycleCount.toLowerCase().includes(q) ||
-        e.remarkSudahDiScan.toLowerCase().includes(q);
-      const matchStatus = filterStatus === 'Semua' || e.remarkSudahDiScan === filterStatus;
-      const matchWeek = filterWeek === 'Semua' || e.weekApproval === filterWeek;
-      return matchSearch && matchStatus && matchWeek;
-    })
-    .sort((a, b) => {
-      if (!sortField) return 0;
-      if (sortField === 'tanggal') {
-        const diff = parseDateVal(a.tanggal) - parseDateVal(b.tanggal);
-        return sortDir === 'asc' ? diff : -diff;
-      }
-      if (sortField === 'week') {
-        const diff = parseWeekNum(a.weekApproval) - parseWeekNum(b.weekApproval);
-        return sortDir === 'asc' ? diff : -diff;
-      }
-      return 0;
-    });
-
-  // Summary counts
+  // Summary counts — based on ALL tasks (not grouped rows)
   const totalScanned = entries.filter((e) => e.remarkSudahDiScan === 'Sudah Di Scan').length;
   const totalPending = entries.filter((e) => e.remarkSudahDiScan === 'Pending').length;
   const totalBelum = entries.filter((e) => e.remarkSudahDiScan === 'Belum Di Scan').length;
   const totalWithPdf = entries.filter((e) => e.pdfUrl !== null).length;
+
+  // ─── GROUPING LOGIC ───────────────────────────────────────────────────────
+  // 1. Filter individual tasks
+  const filteredTasks = entries.filter((e) => {
+    const q = search.toLowerCase();
+    const matchSearch = !q ||
+      e.weekApproval.toLowerCase().includes(q) ||
+      e.tanggal.includes(q) ||
+      formatDate(e.tanggal).includes(q) ||
+      e.catatan.toLowerCase().includes(q) ||
+      (e.cycleCount ?? '').toLowerCase().includes(q) ||
+      e.remarkSudahDiScan.toLowerCase().includes(q);
+    const matchStatus = filterStatus === 'Semua' || e.remarkSudahDiScan === filterStatus;
+    const matchWeek = filterWeek === 'Semua' || e.weekApproval === filterWeek;
+    return matchSearch && matchStatus && matchWeek;
+  });
+
+  // 2. Group filtered tasks by week
+  const groupMap = new Map<string, ApprovalEntry[]>();
+  for (const task of filteredTasks) {
+    const key = task.weekApproval;
+    if (!groupMap.has(key)) groupMap.set(key, []);
+    groupMap.get(key)!.push(task);
+  }
+
+  // 3. Build WeekGroup array and sort
+  const weekGroups: WeekGroup[] = Array.from(groupMap.entries()).map(([week, tasks]) => {
+    const dates = tasks.map((t) => parseDateVal(t.tanggal)).filter((d) => !isNaN(d));
+    const dateVal = dates.length > 0 ? (sortDir === 'asc' ? Math.min(...dates) : Math.max(...dates)) : 0;
+    return { week, tasks, dateVal };
+  });
+
+  weekGroups.sort((a, b) => {
+    if (!sortField) return 0;
+    if (sortField === 'tanggal') {
+      const diff = a.dateVal - b.dateVal;
+      return sortDir === 'asc' ? diff : -diff;
+    }
+    if (sortField === 'week') {
+      const diff = parseWeekNum(a.week) - parseWeekNum(b.week);
+      return sortDir === 'asc' ? diff : -diff;
+    }
+    return 0;
+  });
+  // ─────────────────────────────────────────────────────────────────────────
 
   function handleSortToggle(field: SortField) {
     if (sortField === field) {
@@ -278,6 +302,14 @@ export default function TrackerApprovalContent() {
     return `${d}/${m}/${y}`;
   }
 
+  /** Returns a date label for a group: single date or range if multiple */
+  function groupDateLabel(tasks: ApprovalEntry[]): string {
+    const dates = Array.from(new Set(tasks.map((t) => t.tanggal))).sort();
+    if (dates.length === 0) return '—';
+    if (dates.length === 1) return formatDate(dates[0]);
+    return `${formatDate(dates[0])} – ${formatDate(dates[dates.length - 1])}`;
+  }
+
   function RemarkBadge({ status }: { status: string }) {
     if (status === 'Sudah Di Scan') {
       return (
@@ -303,6 +335,18 @@ export default function TrackerApprovalContent() {
     );
   }
 
+  // Cycle count badge colors (cycling through a palette)
+  const CC_COLORS = [
+    'bg-violet-100 text-violet-700',
+    'bg-blue-100 text-blue-700',
+    'bg-orange-100 text-orange-700',
+    'bg-teal-100 text-teal-700',
+  ];
+  function ccColor(cycleCount: string): string {
+    const idx = CYCLE_COUNT_OPTIONS.indexOf(cycleCount);
+    return CC_COLORS[idx >= 0 ? idx : 0];
+  }
+
   return (
     <div className="p-6 xl:p-8 max-w-screen-2xl mx-auto">
       {/* Header */}
@@ -317,7 +361,7 @@ export default function TrackerApprovalContent() {
         <button onClick={openAddModal} className="btn-primary flex items-center gap-2"><Plus size={16} />Tambah Data</button>
       </div>
 
-      {/* Summary Cards */}
+      {/* Summary Cards — counts tasks, not grouped rows */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
         <SummaryCard label="Total Approval" value={entries.length} color="blue" icon={<CheckSquare size={18} />} />
         <SummaryCard label="Sudah Di Scan" value={totalScanned} total={entries.length} color="green" icon={<CheckCircle size={18} />} />
@@ -402,7 +446,7 @@ export default function TrackerApprovalContent() {
         </div>
       </div>
 
-      {/* Table */}
+      {/* Table — grouped by WEEK */}
       <div className="card-base overflow-hidden">
         {loading ? (
           <div className="flex items-center justify-center py-16 gap-3 text-muted-foreground">
@@ -438,7 +482,7 @@ export default function TrackerApprovalContent() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.length === 0 ? (
+                {weekGroups.length === 0 ? (
                   <tr>
                     <td colSpan={8} className="text-center py-16">
                       <div className="flex flex-col items-center gap-3 text-muted-foreground">
@@ -448,75 +492,134 @@ export default function TrackerApprovalContent() {
                     </td>
                   </tr>
                 ) : (
-                  filtered.map((entry, idx) => (
-                    <tr
-                      key={entry.id}
-                      className={`border-b border-border last:border-0 hover:bg-muted/40 transition-colors duration-150
-                        ${removingId === entry.id ? 'opacity-0' : ''} ${idx % 2 === 0 ? '' : 'bg-muted/20'}`}
-                    >
-                      <td className="px-4 py-3 text-muted-foreground font-tabular text-xs">{idx + 1}</td>
-                      <td className="px-4 py-3 text-sm text-foreground font-tabular whitespace-nowrap">{formatDate(entry.tanggal)}</td>
-                      <td className="px-4 py-3">
-                        <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-primary/10 text-primary">
-                          {entry.weekApproval}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        {entry.cycleCount ? (
-                          <span className="px-2 py-0.5 rounded-md text-xs font-semibold bg-secondary/10 text-secondary whitespace-nowrap">
-                            {entry.cycleCount}
-                          </span>
-                        ) : (
-                          <span className="text-xs text-muted-foreground italic">—</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        <RemarkBadge status={entry.remarkSudahDiScan} />
-                      </td>
-                      <td className="px-4 py-3">
-                        {entry.pdfUrl ? (
-                          <div className="flex items-center gap-1.5">
-                            <FileText size={14} className="text-primary flex-shrink-0" />
-                            <span className="text-xs text-foreground max-w-[120px] truncate" title={entry.pdfName ?? ''}>
-                              {entry.pdfName ?? 'PDF'}
-                            </span>
-                            <a
-                              href={entry.pdfUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="p-1 rounded hover:bg-primary/10 text-primary transition-colors"
-                              title="Lihat / Download PDF"
+                  weekGroups.map((group, groupIdx) => {
+                    const taskCount = group.tasks.length;
+                    return group.tasks.map((task, taskIdx) => {
+                      const isFirst = taskIdx === 0;
+                      const isLast = taskIdx === taskCount - 1;
+                      const isRemoving = removingId === task.id;
+
+                      return (
+                        <tr
+                          key={task.id}
+                          className={`border-b border-border transition-colors duration-150
+                            ${isLast ? 'border-b-2 border-border/60' : ''}
+                            ${isRemoving ? 'opacity-0' : ''}
+                            ${groupIdx % 2 === 0 ? 'bg-white hover:bg-muted/30' : 'bg-muted/10 hover:bg-muted/30'}`}
+                        >
+                          {/* # — only on first task of group, rowspan */}
+                          {isFirst && (
+                            <td
+                              rowSpan={taskCount}
+                              className="px-4 py-3 text-muted-foreground font-tabular text-xs align-top border-r border-border/40"
                             >
-                              <Download size={13} />
-                            </a>
-                          </div>
-                        ) : (
-                          <span className="text-xs text-muted-foreground italic">Belum Ada PDF</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-muted-foreground max-w-[160px] truncate" title={entry.catatan}>
-                        {entry.catatan || <span className="italic opacity-50">—</span>}
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center justify-end gap-1">
-                          <button onClick={() => openEditModal(entry)} className="p-1.5 rounded-lg hover:bg-primary/10 hover:text-primary text-muted-foreground transition-colors" title="Edit">
-                            <Edit2 size={14} />
-                          </button>
-                          <button onClick={() => setDeleteTarget(entry.id)} className="p-1.5 rounded-lg hover:bg-danger-bg hover:text-danger text-muted-foreground transition-colors" title="Hapus">
-                            <Trash2 size={14} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
+                              {groupIdx + 1}
+                            </td>
+                          )}
+
+                          {/* Tanggal — only on first task, rowspan */}
+                          {isFirst && (
+                            <td
+                              rowSpan={taskCount}
+                              className="px-4 py-3 text-sm text-foreground font-tabular whitespace-nowrap align-top border-r border-border/40"
+                            >
+                              {groupDateLabel(group.tasks)}
+                            </td>
+                          )}
+
+                          {/* Week — only on first task, rowspan */}
+                          {isFirst && (
+                            <td
+                              rowSpan={taskCount}
+                              className="px-4 py-3 align-top border-r border-border/40"
+                            >
+                              <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-primary/10 text-primary">
+                                {group.week}
+                              </span>
+                            </td>
+                          )}
+
+                          {/* Cycle Count */}
+                          <td className={`px-4 py-2.5 ${isFirst ? 'pt-3' : ''} ${isLast ? 'pb-3' : ''}`}>
+                            {task.cycleCount ? (
+                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-semibold whitespace-nowrap ${ccColor(task.cycleCount)}`}>
+                                {task.cycleCount}
+                              </span>
+                            ) : (
+                              <span className="text-xs text-muted-foreground italic">—</span>
+                            )}
+                          </td>
+
+                          {/* Remark Scan */}
+                          <td className={`px-4 py-2.5 ${isFirst ? 'pt-3' : ''} ${isLast ? 'pb-3' : ''}`}>
+                            <RemarkBadge status={task.remarkSudahDiScan} />
+                          </td>
+
+                          {/* Hasil Scan */}
+                          <td className={`px-4 py-2.5 ${isFirst ? 'pt-3' : ''} ${isLast ? 'pb-3' : ''}`}>
+                            {task.pdfUrl ? (
+                              <div className="flex items-center gap-1.5">
+                                <FileText size={14} className="text-primary flex-shrink-0" />
+                                <span className="text-xs text-foreground max-w-[110px] truncate" title={task.pdfName ?? ''}>
+                                  {task.pdfName ?? 'PDF'}
+                                </span>
+                                <a
+                                  href={task.pdfUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="p-1 rounded hover:bg-primary/10 text-primary transition-colors"
+                                  title="Lihat / Download PDF"
+                                >
+                                  <Download size={13} />
+                                </a>
+                              </div>
+                            ) : (
+                              <span className="text-xs text-muted-foreground italic">Belum Ada PDF</span>
+                            )}
+                          </td>
+
+                          {/* Catatan */}
+                          <td className={`px-4 py-2.5 text-sm text-muted-foreground max-w-[160px] truncate ${isFirst ? 'pt-3' : ''} ${isLast ? 'pb-3' : ''}`} title={task.catatan}>
+                            {task.catatan || <span className="italic opacity-50">—</span>}
+                          </td>
+
+                          {/* Aksi */}
+                          <td className={`px-4 py-2.5 ${isFirst ? 'pt-3' : ''} ${isLast ? 'pb-3' : ''}`}>
+                            <div className="flex items-center justify-end gap-1">
+                              <button
+                                onClick={() => openEditModal(task)}
+                                className="p-1.5 rounded-lg hover:bg-primary/10 hover:text-primary text-muted-foreground transition-colors"
+                                title={`Edit ${task.cycleCount ?? ''}`}
+                              >
+                                <Edit2 size={14} />
+                              </button>
+                              <button
+                                onClick={() => setDeleteTarget(task.id)}
+                                className="p-1.5 rounded-lg hover:bg-danger-bg hover:text-danger text-muted-foreground transition-colors"
+                                title={`Hapus ${task.cycleCount ?? ''}`}
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    });
+                  })
                 )}
               </tbody>
             </table>
           </div>
         )}
-        {!loading && !apiError && filtered.length > 0 && (
+        {!loading && !apiError && weekGroups.length > 0 && (
           <div className="px-4 py-3 border-t border-border bg-muted/30 flex items-center justify-between text-xs text-muted-foreground">
-            <span>Menampilkan <strong>{filtered.length}</strong> dari <strong>{entries.length}</strong> data</span>
+            <span>
+              Menampilkan <strong>{weekGroups.length}</strong> week
+              {' '}(<strong>{filteredTasks.length}</strong> task)
+              {filteredTasks.length !== entries.length && (
+                <> dari total <strong>{entries.length}</strong> task</>
+              )}
+            </span>
             <span>Data dari database</span>
           </div>
         )}
@@ -588,7 +691,6 @@ export default function TrackerApprovalContent() {
               <div>
                 <label className="block text-sm font-semibold text-foreground mb-1.5">Hasil Scan Berkas</label>
 
-                {/* Show existing PDF when editing */}
                 {editingEntry?.pdfUrl && !pdfFile && (
                   <div className="mb-3 p-3 rounded-lg border border-border bg-muted/30 flex items-center justify-between gap-3">
                     <div className="flex items-center gap-2 min-w-0">
@@ -596,34 +698,18 @@ export default function TrackerApprovalContent() {
                       <span className="text-sm text-foreground truncate">{editingEntry.pdfName ?? 'PDF'}</span>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
-                      <a
-                        href={editingEntry.pdfUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs text-primary hover:underline"
-                      >
-                        Lihat PDF
-                      </a>
-                      <a
-                        href={editingEntry.pdfUrl}
-                        download={editingEntry.pdfName ?? 'hasil-scan.pdf'}
-                        className="text-xs text-primary hover:underline"
-                      >
-                        Download
-                      </a>
+                      <a href={editingEntry.pdfUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline">Lihat PDF</a>
+                      <a href={editingEntry.pdfUrl} download={editingEntry.pdfName ?? 'hasil-scan.pdf'} className="text-xs text-primary hover:underline">Download</a>
                     </div>
                   </div>
                 )}
 
-                {/* PDF selected preview */}
                 {pdfFile && (
                   <div className="mb-3 p-3 rounded-lg border border-primary/30 bg-primary/5 flex items-center justify-between gap-3">
                     <div className="flex items-center gap-2 min-w-0">
                       <FileText size={16} className="text-primary flex-shrink-0" />
                       <span className="text-sm text-foreground truncate">{pdfFile.name}</span>
-                      <span className="text-xs text-muted-foreground flex-shrink-0">
-                        ({(pdfFile.size / 1024 / 1024).toFixed(2)} MB)
-                      </span>
+                      <span className="text-xs text-muted-foreground flex-shrink-0">({(pdfFile.size / 1024 / 1024).toFixed(2)} MB)</span>
                     </div>
                     <button
                       type="button"
@@ -635,7 +721,6 @@ export default function TrackerApprovalContent() {
                   </div>
                 )}
 
-                {/* Upload button */}
                 <button
                   type="button"
                   onClick={() => pdfInputRef.current?.click()}
@@ -647,13 +732,7 @@ export default function TrackerApprovalContent() {
                   </span>
                   <span className="text-xs">Hanya PDF — maks. 10MB</span>
                 </button>
-                <input
-                  ref={pdfInputRef}
-                  type="file"
-                  accept="application/pdf,.pdf"
-                  className="hidden"
-                  onChange={handlePdfChange}
-                />
+                <input ref={pdfInputRef} type="file" accept="application/pdf,.pdf" className="hidden" onChange={handlePdfChange} />
                 {pdfError && (
                   <p className="mt-1.5 text-xs text-danger flex items-center gap-1">
                     <AlertCircle size={12} /> {pdfError}
@@ -664,12 +743,7 @@ export default function TrackerApprovalContent() {
               {/* Catatan */}
               <div>
                 <label className="block text-sm font-semibold text-foreground mb-1.5">Catatan</label>
-                <textarea
-                  {...register('catatan')}
-                  rows={3}
-                  placeholder="Keterangan tambahan (opsional)"
-                  className="input-field resize-none"
-                />
+                <textarea {...register('catatan')} rows={3} placeholder="Keterangan tambahan (opsional)" className="input-field resize-none" />
               </div>
 
               <div className="flex justify-end gap-3 pt-2 border-t border-border">
