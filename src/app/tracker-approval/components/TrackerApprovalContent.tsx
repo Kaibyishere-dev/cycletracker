@@ -670,11 +670,10 @@ export default function TrackerApprovalContent() {
                               {groupIdx + 1}
                             </td>
                           )}
-                          {isFirst && (
-                            <td rowSpan={taskCount} className="px-4 py-3 text-sm text-foreground font-tabular whitespace-nowrap align-top border-r border-border/40">
-                              {groupDateLabel(group.tasks)}
-                            </td>
-                          )}
+                          {/* Date — individual per task, no rowspan */}
+                          <td className={`px-4 py-2.5 text-sm text-foreground font-tabular whitespace-nowrap border-r border-border/40 ${isFirst ? 'pt-3' : ''} ${isLast ? 'pb-3' : ''}`}>
+                            {formatDate(task.tanggal)}
+                          </td>
                           {isFirst && (
                             <td rowSpan={taskCount} className="px-4 py-3 align-top border-r border-border/40">
                               <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-primary/10 text-primary">
