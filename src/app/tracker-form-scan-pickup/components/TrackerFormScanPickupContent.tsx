@@ -408,7 +408,7 @@ export default function TrackerFormScanPickupContent() {
                   </th>
                   <th className="text-left px-4 py-3 font-semibold text-xs uppercase tracking-wider text-muted-foreground whitespace-nowrap">Remark Sudah Di Scan</th>
                   <th className="text-left px-4 py-3 font-semibold text-xs uppercase tracking-wider text-muted-foreground whitespace-nowrap">Adjustment</th>
-                  <th className="text-left px-4 py-3 font-semibold text-xs uppercase tracking-wider text-muted-foreground whitespace-nowrap">Hasil Scan</th>
+                  <th className="text-left px-4 py-3 font-semibold text-xs uppercase tracking-wider text-muted-foreground whitespace-nowrap">Adjustment</th>
                   <th className="text-left px-4 py-3 font-semibold text-xs uppercase tracking-wider text-muted-foreground">Foto</th>
                   <th className="text-left px-4 py-3 font-semibold text-xs uppercase tracking-wider text-muted-foreground">Catatan</th>
                   <th className="text-right px-4 py-3 font-semibold text-xs uppercase tracking-wider text-muted-foreground">Aksi</th>
