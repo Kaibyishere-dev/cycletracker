@@ -22,11 +22,14 @@ export async function GET() {
 
     const entries = (data || []).map((row) => ({
       id: row.id,
+      namaPt: row.nama_pt ?? '',
       remarkSudahDiScan: row.remark_sudah_di_scan,
       remarkSudahDiAdjust: row.remark_sudah_di_adjust,
       tanggalInput: row.tanggal_input,
       photoUrl: row.photo_url,
       photoName: row.photo_name,
+      pdfUrl: row.pdf_url ?? null,
+      pdfName: row.pdf_name ?? null,
       catatan: row.catatan,
       editedBy: row.edited_by,
       editedAt: row.edited_at,
@@ -48,8 +51,11 @@ export async function POST(request: NextRequest) {
 
     const supabase = createAdminClient();
     const body = await request.json();
-    const { remarkSudahDiScan, remarkSudahDiAdjust, tanggalInput, photoUrl, photoName, catatan, editedBy } = body;
+    const { namaPt, remarkSudahDiScan, remarkSudahDiAdjust, tanggalInput, photoUrl, photoName, pdfUrl, pdfName, catatan, editedBy } = body;
 
+    if (!namaPt || !namaPt.trim()) {
+      return NextResponse.json({ error: 'Nama PT wajib diisi' }, { status: 400 });
+    }
     if (!remarkSudahDiScan || !remarkSudahDiAdjust || !tanggalInput) {
       return NextResponse.json({ error: 'Remark scan, remark adjust, dan tanggal wajib diisi' }, { status: 400 });
     }
@@ -57,11 +63,14 @@ export async function POST(request: NextRequest) {
     const { data, error } = await supabase
       .from('tracker_form_scan_pickup')
       .insert({
+        nama_pt: namaPt.trim(),
         remark_sudah_di_scan: remarkSudahDiScan,
         remark_sudah_di_adjust: remarkSudahDiAdjust,
         tanggal_input: tanggalInput,
         photo_url: photoUrl ?? null,
         photo_name: photoName ?? null,
+        pdf_url: pdfUrl ?? null,
+        pdf_name: pdfName ?? null,
         catatan: catatan ?? '',
         edited_by: editedBy ?? '',
         edited_at: new Date().toISOString(),
@@ -76,11 +85,14 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       id: data.id,
+      namaPt: data.nama_pt ?? '',
       remarkSudahDiScan: data.remark_sudah_di_scan,
       remarkSudahDiAdjust: data.remark_sudah_di_adjust,
       tanggalInput: data.tanggal_input,
       photoUrl: data.photo_url,
       photoName: data.photo_name,
+      pdfUrl: data.pdf_url ?? null,
+      pdfName: data.pdf_name ?? null,
       catatan: data.catatan,
       editedBy: data.edited_by,
       editedAt: data.edited_at,

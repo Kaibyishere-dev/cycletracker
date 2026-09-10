@@ -26,11 +26,14 @@ export interface ApprovalEntry {
 
 export interface FormScanPickupEntry {
   id: string;
+  namaPt: string;
   remarkSudahDiScan: 'Sudah Di Scan' | 'Belum Di Scan';
   remarkSudahDiAdjust: 'Sudah Di Adjust' | 'Belum Di Adjust';
   tanggalInput: string;
   photoUrl: string | null;
   photoName: string | null;
+  pdfUrl: string | null;
+  pdfName: string | null;
   catatan: string;
   editedBy: string;
   editedAt: string;
@@ -121,7 +124,7 @@ export const initialHasilSO: HasilSOEntry[] = [
   namaPT: 'PT Surya Gemilang Nusantara',
   remarkSudahDiScan: 'Sudah Di Scan',
   tanggalInput: '2026-09-04',
-  photoUrl: "https://images.unsplash.com/photo-1692758449128-f2e2d3b40cd6",
+  photoUrl: "https://img.rocket.new/generatedImages/rocket_gen_img_129bacbf9-1765204284398.png",
   photoName: 'scan_surya_gemilang_01.jpg',
   catatan: '',
   editedBy: 'admin.cyclecount',
@@ -132,7 +135,7 @@ export const initialHasilSO: HasilSOEntry[] = [
   namaPT: 'PT Graha Persada Indah',
   remarkSudahDiScan: 'Sudah Di Scan',
   tanggalInput: '2026-09-05',
-  photoUrl: "https://images.unsplash.com/photo-1671533009246-11d0b17f2182",
+  photoUrl: "https://images.unsplash.com/photo-1708191124984-61c3d49f34e3",
   photoName: 'scan_graha_persada_01.jpg',
   catatan: 'Scan ulang karena blur',
   editedBy: 'supervisor.cc',
@@ -154,7 +157,7 @@ export const initialHasilSO: HasilSOEntry[] = [
   namaPT: 'PT Tunas Harapan Bangsa',
   remarkSudahDiScan: 'Sudah Di Scan',
   tanggalInput: '2026-09-08',
-  photoUrl: "https://images.unsplash.com/photo-1546971647-ef9aef536bce",
+  photoUrl: "https://images.unsplash.com/photo-1545568900-77a62c23454c",
   photoName: 'scan_tunas_harapan_01.jpg',
   catatan: 'Hari ini — scan pagi',
   editedBy: 'admin.cyclecount',
@@ -179,7 +182,7 @@ export const initialApproval: ApprovalEntry[] = [
   tanggal: '2026-09-01',
   weekApproval: 'W36',
   remarkSudahDiScan: 'Sudah Di Scan',
-  photoUrl: "https://img.rocket.new/generatedImages/rocket_gen_img_14bad72c6-1785528183192.png",
+  photoUrl: "https://img.rocket.new/generatedImages/rocket_gen_img_1f33d1387-1777663912752.png",
   photoName: 'apv_w36_01.jpg',
   catatan: 'Approval minggu 36 lengkap',
   editedBy: 'admin.cyclecount',
@@ -190,7 +193,7 @@ export const initialApproval: ApprovalEntry[] = [
   tanggal: '2026-09-01',
   weekApproval: 'W36',
   remarkSudahDiScan: 'Sudah Di Scan',
-  photoUrl: 'https://images.unsplash.com/photo-1568667256549-094345857637?w=400',
+  photoUrl: "https://img.rocket.new/generatedImages/rocket_gen_img_1ec5f4681-1766772669233.png",
   photoName: 'apv_w36_02.jpg',
   catatan: '',
   editedBy: 'supervisor.cc',
