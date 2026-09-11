@@ -75,8 +75,8 @@ export default function Sidebar({
           <Image
             src="/assets/images/IMG_1662-removebg-preview-1789132101535.png"
             alt="Cycle Count Logo"
-            width={32}
-            height={32}
+            width={40}
+            height={40}
             className="flex-shrink-0 object-contain"
           />
           {!collapsed && (
