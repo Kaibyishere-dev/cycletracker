@@ -1,7 +1,7 @@
 'use client';
 import React from 'react';
 import Link from 'next/link';
-import AppLogo from '@/components/ui/AppLogo';
+import Image from 'next/image';
 import { AdminUser } from '@/lib/auth';
 import {
   FileText,
@@ -72,7 +72,13 @@ export default function Sidebar({
       {/* Logo */}
       <div className={`flex items-center gap-3 px-4 py-4 border-b border-white/10 ${collapsed ? 'justify-center' : ''}`}>
         <div onClick={onMobileClose} className="flex items-center gap-3 flex-1 min-w-0">
-          <AppLogo size={32} />
+          <Image
+            src="/assets/images/IMG_1662-removebg-preview-1789132101535.png"
+            alt="Cycle Count Logo"
+            width={50}
+            height={50}
+            className="flex-shrink-0 object-contain"
+          />
           {!collapsed && (
             <span className="font-bold text-base tracking-tight text-primary-foreground truncate">
               Cycle Count

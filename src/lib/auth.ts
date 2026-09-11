@@ -7,35 +7,47 @@ export interface AdminUser {
   role: string;
 }
 
-export const ADMIN_CREDENTIALS = [
+// Authorized Employee IDs — stored server-side only (this file is used by API routes)
+// Password for each employee is their Employee ID (temporary policy)
+export const AUTHORIZED_EMPLOYEES = [
   {
-    username: 'admin.cyclecount',
-    password: 'CC@dmin2026',
+    employeeId: '2506400',
+    password: '2506400',
     user: {
-      id: 'user-001',
-      username: 'admin.cyclecount',
-      name: 'Admin Cycle Count',
-      role: 'Administrator',
+      id: 'emp-2506400',
+      username: '2506400',
+      name: 'Employee 2506400',
+      role: 'Employee',
     },
   },
   {
-    username: 'supervisor.cc',
-    password: 'Sup3rv1sor!',
+    employeeId: '250441',
+    password: '250441',
     user: {
-      id: 'user-002',
-      username: 'supervisor.cc',
-      name: 'Supervisor Cycle Count',
-      role: 'Supervisor',
+      id: 'emp-250441',
+      username: '250441',
+      name: 'Employee 250441',
+      role: 'Employee',
+    },
+  },
+  {
+    employeeId: '250254',
+    password: '250254',
+    user: {
+      id: 'emp-250254',
+      username: '250254',
+      name: 'Employee 250254',
+      role: 'Employee',
     },
   },
 ];
 
 export function validateCredentials(
-  username: string,
+  employeeId: string,
   password: string
 ): AdminUser | null {
-  const match = ADMIN_CREDENTIALS.find(
-    (c) => c.username === username && c.password === password
+  const match = AUTHORIZED_EMPLOYEES.find(
+    (c) => c.employeeId === employeeId && c.password === password
   );
   return match ? match.user : null;
 }
