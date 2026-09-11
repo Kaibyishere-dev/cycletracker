@@ -6,14 +6,18 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { username, password } = body;
 
-    if (!username || !password) {
-      return NextResponse.json({ error: 'Username dan password wajib diisi' }, { status: 400 });
+    if (!username) {
+      return NextResponse.json({ error: 'Employee ID wajib diisi.' }, { status: 400 });
+    }
+
+    if (!password) {
+      return NextResponse.json({ error: 'Password wajib diisi.' }, { status: 400 });
     }
 
     const user = validateCredentials(username, password);
 
     if (!user) {
-      return NextResponse.json({ error: 'Kredensial tidak valid' }, { status: 401 });
+      return NextResponse.json({ error: 'Employee ID atau password salah.' }, { status: 401 });
     }
 
     const response = NextResponse.json({ user });
